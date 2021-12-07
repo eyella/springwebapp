@@ -1,0 +1,200 @@
+---
+version: 2
+plan:
+  project-key: TES1
+  key: TES1
+  name: Parent Plan
+  description: Parent Plan
+stages:
+  - Default Stage:
+      manual: false
+      final: false
+      jobs:
+        - Default Job
+Default Job:
+  key: JOB1
+  tasks:
+    - checkout:
+        force-clean-build: 'false'
+        description: Checkout Default Repository
+    - maven:
+        executable: Maven
+        jdk: JDK 11
+        goal: clean install
+        description: Maven
+  artifact-subscriptions: []
+repositories:
+  - eyella:
+      scope: global
+triggers:
+  - polling:
+      period: '30'
+branches:
+  create: manually
+  delete: never
+  link-to-jira: true
+notifications: []
+labels: []
+other:
+  concurrent-build-plugin: system-default
+---
+version: 2
+plan:
+  key: TES1-TES1
+plan-permissions:
+  - users:
+      - ryella
+    permissions:
+      - view
+      - edit
+      - build
+      - clone
+      - admin
+      - view_configuration
+...
+
+---
+version: 2
+plan:
+  project-key: TES1
+  key: CHIL1
+  name: Child plan
+stages:
+  - Default Stage:
+      manual: false
+      final: false
+      jobs:
+        - Default Job
+Default Job:
+  key: JOB1
+  other:
+    clean-working-dir: true
+  # Some plugin configurations are not supported by YAML Specs
+  tasks:
+    - checkout:
+        force-clean-build: 'false'
+        description: Checkout Default Repository
+    - maven:
+        executable: Maven
+        jdk: JDK 11
+        goal: clean test
+        description: Maven Test
+    - maven:
+        executable: Maven
+        jdk: JDK 11
+        goal: clean install
+        description: Artifact
+  artifacts:
+    - name: eyella
+      location: target
+      pattern: '**/*.jar'
+      shared: true
+      required: false
+  artifact-subscriptions: []
+repositories:
+  - eyella:
+      scope: global
+triggers:
+  - polling:
+      period: '180'
+branches:
+  create: manually
+  delete: never
+  link-to-jira: true
+notifications: []
+labels: []
+other:
+  concurrent-build-plugin: system-default
+---
+version: 2
+plan:
+  key: TES1-CHIL1
+plan-permissions:
+  - users:
+      - ryella
+    permissions:
+      - view
+      - edit
+      - build
+      - clone
+      - admin
+      - view_configuration
+...
+
+---
+version: 2
+deployment:
+  name: Deployment for Test1
+  source-plan: TES1-TES1
+release-naming:
+  next-version-name: release-5
+  applies-to-branches: false
+  auto-increment: true
+  auto-increment-variables: []
+environments: []
+---
+version: 2
+deployment:
+  name: Deployment for Test1
+deployment-permissions:
+  - users:
+      - ryella
+    permissions:
+      - view
+      - edit
+      - view_configuration
+...
+---
+version: 2
+deployment:
+  name: Deployment for Test Project
+  source-plan: TES1-CHIL1
+release-naming:
+  next-version-name: REL_21.4.1
+  applies-to-branches: false
+  auto-increment: true
+  auto-increment-variables: []
+environments:
+  - dev1498
+dev1498:
+  triggers:
+    - build-success
+  tasks:
+    - artifact-download:
+        artifacts:
+          - destination: /e2open/home/eoadmin/run
+            name: eyella
+    - clean
+    - script:
+        interpreter: BINSH_OR_CMDEXE
+        scripts:
+          - |-
+            kill $(ps aux | grep 'spring-boot-web-0.0.1-SNAPSHOT' | grep -v grep | awk '{print $2}');
+            /usr/bin/java -jar /e2open/home/eoadmin/run/spring-boot-web-0.0.1-SNAPSHOT.jar 2>&1 &
+            
+            exit;
+  final-tasks: []
+  variables: {}
+  requirements: []
+  notifications: []
+---
+version: 2
+deployment:
+  name: Deployment for Test Project
+deployment-permissions:
+  - users:
+      - ryella
+    permissions:
+      - view
+      - edit
+      - view_configuration
+environment-permissions:
+  - dev1498:
+      - users:
+          - ryella
+        permissions:
+          - view
+          - edit
+          - deploy
+          - view_configuration
+...
